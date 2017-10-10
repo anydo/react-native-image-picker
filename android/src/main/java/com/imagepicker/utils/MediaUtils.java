@@ -20,7 +20,6 @@ import com.imagepicker.media.ImageConfig;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -158,24 +157,15 @@ public class MediaUtils
         final boolean forceLocal = requestCode == REQUEST_LAUNCH_IMAGE_CAPTURE;
         final File resized = createNewFile(context, options, !forceLocal);
 
-        if (resized == null)
-        {
-            if (photo != null)
-            {
-                photo.recycle();
-                photo = null;
-            }
-            if (scaledPhoto != null)
-            {
-                scaledPhoto.recycle();
-                scaledPhoto = null;
-            }
+        if (resized == null) {
+            photo.recycle();
+            scaledPhoto.recycle();
             return imageConfig;
         }
 
         result = result.withResizedFile(resized);
 
-        FileOutputStream fos;
+        FileOutputStream fos = null;
         try
         {
             fos = new FileOutputStream(result.resized);
@@ -184,18 +174,18 @@ public class MediaUtils
         catch (IOException e)
         {
             e.printStackTrace();
+        } finally {
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    // Ignored
+                }
+            }
         }
 
-        if (photo != null)
-        {
-            photo.recycle();
-            photo = null;
-        }
-        if (scaledPhoto != null)
-        {
-            scaledPhoto.recycle();
-            scaledPhoto = null;
-        }
+        photo.recycle();
+        scaledPhoto.recycle();
         return result;
     }
 
