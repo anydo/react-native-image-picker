@@ -1,7 +1,9 @@
 package com.imagepicker.permissions;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AlertDialog;
@@ -9,10 +11,8 @@ import android.support.v7.app.AlertDialog;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableNativeMap;
 import com.imagepicker.ImagePickerModule;
-import com.imagepicker.R;
 
 import java.lang.ref.WeakReference;
-import java.util.HashMap;
 
 /**
  * Created by rusfearuth on 03.03.17.
@@ -20,6 +20,9 @@ import java.util.HashMap;
 
 public class PermissionUtils
 {
+
+    private static final String PERMISSION_ASK_AGAIN_PERFERENCE_SUFFIX = "_picker_ask_again";
+
     public static @Nullable AlertDialog explainingDialog(@NonNull final ImagePickerModule module,
                                                          @NonNull final ReadableMap options,
                                                          @NonNull final OnExplainingPermissionCallback callback)
@@ -81,5 +84,15 @@ public class PermissionUtils
     public interface OnExplainingPermissionCallback {
         void onCancel(WeakReference<ImagePickerModule> moduleInstance, DialogInterface dialogInterface);
         void onReTry(WeakReference<ImagePickerModule> moduleInstance, DialogInterface dialogInterface);
+    }
+
+    public static void saveDontAskAgainResult(Context context, String permissionName, boolean dontAskAgain) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit().putBoolean(permissionName
+                + PERMISSION_ASK_AGAIN_PERFERENCE_SUFFIX, dontAskAgain).apply();
+    }
+
+    public static boolean hasUserCheckedDontAskAgain(Context context, String permissionName) {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+                .getBoolean(permissionName + PERMISSION_ASK_AGAIN_PERFERENCE_SUFFIX, false);
     }
 }
