@@ -85,32 +85,28 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
   private int videoDurationLimit = 0;
 
   private ResponseHelper responseHelper = new ResponseHelper();
-  private PermissionListener listener = new PermissionListener()
-  {
+  private PermissionListener listener = new PermissionListener() {
     public boolean onRequestPermissionsResult(final int requestCode,
                                               @NonNull final String[] permissions,
-                                              @NonNull final int[] grantResults)
-    {
+                                              @NonNull final int[] grantResults) {
       boolean permissionsGranted = true;
-      for (int i = 0; i < permissions.length; i++)
-      {
+      for (int i = 0; i < permissions.length; i++) {
         final boolean granted = grantResults[i] == PackageManager.PERMISSION_GRANTED;
+        final boolean checkDontAskAgain = !granted && !ActivityCompat.shouldShowRequestPermissionRationale(getActivity(), permissions[i]);
+        PermissionUtils.saveDontAskAgainResult(getContext(), permissions[i], checkDontAskAgain);
         permissionsGranted = permissionsGranted && granted;
       }
 
-      if (callback == null || options == null)
-      {
+      if (callback == null || options == null) {
         return false;
       }
 
-      if (!permissionsGranted)
-      {
+      if (!permissionsGranted) {
         responseHelper.invokeError(callback, "Permissions weren't granted");
         return false;
       }
 
-      switch (requestCode)
-      {
+      switch (requestCode) {
         case REQUEST_PERMISSIONS_FOR_CAMERA:
           launchCamera(options, callback);
           break;
@@ -550,9 +546,10 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
 
     if (!permissionsGrated)
     {
-      final Boolean dontAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+      final Boolean showExplainingDialog = PermissionUtils.hasUserCheckedDontAskAgain(getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+              || ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
-      if (dontAskAgain)
+      if (showExplainingDialog)
       {
         final AlertDialog dialog = PermissionUtils
                 .explainingDialog(this, options, new PermissionUtils.OnExplainingPermissionCallback()
@@ -578,15 +575,20 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
                     {
                       return;
                     }
-                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    Uri uri = Uri.fromParts("package", module.getContext().getPackageName(), null);
-                    intent.setData(uri);
-                    final Activity innerActivity = module.getActivity();
-                    if (innerActivity == null)
-                    {
-                      return;
+
+                    if (PermissionUtils.hasUserCheckedDontAskAgain(module.getContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                      Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                      Uri uri = Uri.fromParts("package", module.getContext().getPackageName(), null);
+                      intent.setData(uri);
+                      final Activity innerActivity = module.getActivity();
+                      if (innerActivity == null)
+                      {
+                        return;
+                      }
+                      innerActivity.startActivityForResult(intent, 1);
+                    } else {
+                      askPermissionsFromUser(activity, requestCode);
                     }
-                    innerActivity.startActivityForResult(intent, 1);
                   }
                 });
         if (dialog != null) {
@@ -594,30 +596,28 @@ public class ImagePickerModule extends ReactContextBaseJavaModule
         }
         return false;
       }
-      else
-      {
-        String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
-        if (activity instanceof ReactActivity)
-        {
-          ((ReactActivity) activity).requestPermissions(PERMISSIONS, requestCode, listener);
-        }
-        else if (activity instanceof OnImagePickerPermissionsCallback)
-        {
-          ((OnImagePickerPermissionsCallback) activity).setPermissionListener(listener);
-          ActivityCompat.requestPermissions(activity, PERMISSIONS, requestCode);
-        }
-        else
-        {
-          final String errorDescription = new StringBuilder(activity.getClass().getSimpleName())
-                  .append(" must implement ")
-                  .append(OnImagePickerPermissionsCallback.class.getSimpleName())
-                  .toString();
-          throw new UnsupportedOperationException(errorDescription);
-        }
-        return false;
+      else {
+        return askPermissionsFromUser(activity, requestCode);
       }
     }
     return true;
+  }
+
+  private boolean askPermissionsFromUser(Activity activity, int requestCode) {
+    String[] PERMISSIONS = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
+    if (activity instanceof ReactActivity) {
+      ((ReactActivity) activity).requestPermissions(PERMISSIONS, requestCode, listener);
+    } else if (activity instanceof OnImagePickerPermissionsCallback) {
+      ((OnImagePickerPermissionsCallback) activity).setPermissionListener(listener);
+      ActivityCompat.requestPermissions(activity, PERMISSIONS, requestCode);
+    } else {
+      final String errorDescription = new StringBuilder(activity.getClass().getSimpleName())
+              .append(" must implement ")
+              .append(OnImagePickerPermissionsCallback.class.getSimpleName())
+              .toString();
+      throw new UnsupportedOperationException(errorDescription);
+    }
+    return false;
   }
 
   private boolean isCameraAvailable() {
